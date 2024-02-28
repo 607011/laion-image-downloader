@@ -15,29 +15,42 @@ from downloadhelper import download_image_with_retry
 
 
 def main():
+    PROCESSED_FILE = "processed.txt"
     COLS = ["URL", "HEIGHT", "WIDTH", "TEXT"]
     ALLOWED_EXTS = [".jpg", ".png"]
     NUM_THREADS_DOWNLOAD = 80
     NUM_THREADS_CONVERSION = os.cpu_count()
     MIN_IMG_SIZE = 256
+    DEFAULT_FILTER_REGEX = r"\bsheep\b"
+
+    filter_regex = DEFAULT_FILTER_REGEX
 
     # PyArrow filter to select only images that are square
     # and have `SIZE` pixels in each dimension
     ONLY_SQUARE = (
         (pc.field("WIDTH") == pc.field("HEIGHT"))
         & (pc.field("WIDTH") >= pc.scalar(MIN_IMG_SIZE))
-        & pc.match_substring(pc.field("TEXT"), "cat", ignore_case=True)
+        & pc.match_substring_regex(pc.field("TEXT"), filter_regex, ignore_case=True)
     )
 
-    files = glob.glob("data/the-eye.eu/*.parquet")
+    filter_rules = ONLY_SQUARE
+
+    files = set(glob.glob("data/the-eye.eu/*.parquet"))
+    if os.path.isfile(PROCESSED_FILE):
+        processed = {file.strip() for file in open(PROCESSED_FILE, "r").readlines()}
+        files = files.difference(processed)
+    if len(files) == 0:
+        print("Nothing to do.")
+        return
+
     num_threads_download = NUM_THREADS_DOWNLOAD
     num_threads_conversion = NUM_THREADS_CONVERSION
     disallowed_header_directives = []
     size = (MIN_IMG_SIZE, MIN_IMG_SIZE)
 
     def entry_generator(file: str):
-        table = pq.read_table(file, columns=COLS, filters=ONLY_SQUARE)
-        print(f"""Applying filter {ONLY_SQUARE}""")
+        table = pq.read_table(file, columns=COLS, filters=filter_rules)
+        print(f"""Applying filter {filter_rules}""")
         print(f"""Found {table.num_rows} entries.""")
         for batch in table.to_batches():
             for _idx, row in batch.to_pandas().iterrows():
@@ -73,13 +86,11 @@ def main():
     sem = BoundedSemaphore(num_threads_download)
     conversion_pool = ThreadPool(num_threads_conversion)
     download_pool = ThreadPool(num_threads_download)
-    MAX_FILE_COUNT = 100
-
     t0 = time.time()
-
     file_counter = 0
+
     for file in files:
-        print(f"""Processing {file} ... """)
+        print(f"""Processing {file} ...""")
         entries = download_pool.imap_unordered(download_task, entry_generator(file))
         for url, img_bytes, _err_msg in entries:
             file_counter += 1
@@ -91,7 +102,8 @@ def main():
                 )
             sem.release()
         print("\r\u001b[K")
-        # break  # remove this line for production release
+        with open(PROCESSED_FILE, "a+") as ready_file:
+            print(file, file=ready_file)
 
     conversion_pool.close()
     conversion_pool.join()

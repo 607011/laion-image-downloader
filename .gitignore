@@ -2,3 +2,6 @@
 Pipfile.lock
 processed.txt
 images
+images.tar
+images.tar.*
+

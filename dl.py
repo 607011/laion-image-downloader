@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from multiprocessing.pool import ThreadPool
 from threading import BoundedSemaphore
 import pyarrow.parquet as pq
@@ -11,13 +11,15 @@ import hashlib
 import io
 import os
 import time
+import sys
+from tarfile import TarFile, TarInfo
 from downloadhelper import download_image_with_retry
 
 
 def main():
     PROCESSED_FILE = "processed.txt"
     COLS = ["URL", "HEIGHT", "WIDTH", "TEXT"]
-    ALLOWED_EXTS = [".jpg", ".png"]
+    ALLOWED_EXTS = ["jpg", "png"]
     NUM_THREADS_DOWNLOAD = 80
     NUM_THREADS_CONVERSION = os.cpu_count()
     MIN_IMG_SIZE = 256
@@ -65,38 +67,48 @@ def main():
             retries=0,
             disallowed_header_directives=disallowed_header_directives,
         )
+        if img_bytes is None:
+            return url, None, err_msg
+            
         return url, img_bytes, err_msg
 
-    def save_image_task(url, img_bytes):
-        _filename, file_ext = os.path.splitext(urlparse(url).path)
-        if file_ext not in ALLOWED_EXTS:
-            return
-        hash = hashlib.sha256(img_bytes).hexdigest()
-        CHUNK_SIZE = 8
-        path = os.path.join("images", *[hash[i : i + CHUNK_SIZE] for i in range(0, 64 - CHUNK_SIZE, CHUNK_SIZE)])
-        os.makedirs(path, exist_ok=True)
-        img_filename = os.path.join(path, f"""{hash}{file_ext}""")
-        if os.path.exists(img_filename):
-            return
-        img = Image.open(io.BytesIO(img_bytes))
-        w, h = img.size
-        assert w == h and w >= MIN_IMG_SIZE
-        img = img.resize(size, resample=Image.BICUBIC)
-        img.save(img_filename)
-
     sem = BoundedSemaphore(num_threads_download)
-    conversion_pool = ThreadPool(num_threads_conversion)
     download_pool = ThreadPool(num_threads_download)
     t0 = time.time()
     file_counter = 0
+    tar_out_file = open("images.tar", "wb")
+    ar = TarFile("images.tar", "w")
 
     for file in files:
         print(f"""Processing {file} ...""")
         entries = download_pool.imap_unordered(download_task, entry_generator(file))
-        for url, img_bytes, _err_msg in entries:
+        for url, img_bytes, err_msg in entries:
             file_counter += 1
+            if err_msg is not None:
+                sem.release()
+                continue
             if img_bytes is not None:
-                conversion_pool.apply_async(save_image_task, args=(url, img_bytes))
+                _filename, file_ext = os.path.splitext(urlparse(url).path)
+                file_ext = file_ext[1:]
+                if file_ext not in ALLOWED_EXTS:
+                    sem.release()
+                    continue
+                hash = hashlib.sha3_256(img_bytes).hexdigest()
+                try:
+                    img = Image.open(io.BytesIO(img_bytes))
+                except UnidentifiedImageError as e:
+                    print(e, file=sys.stderr)
+                img = img.resize(size, resample=Image.BICUBIC)
+                img_stream = io.BytesIO()
+                img.convert("RGB").save(img_stream, format="JPEG", quality=80, optimize=True)
+                ti = TarInfo(f"""{hash}.jpg""")
+                ti.size = len(img_stream.getvalue())
+                img_stream.seek(0)
+                ti.mtime = t0
+                ti.mode = 0o664
+                ti.uname = "bigdata"
+                ti.gname = "bigdata"
+                ar.addfile(ti, img_stream)
                 print(
                     f"""\r\u001b[32m{file_counter / (time.time() - t0):.2f}/s\u001b[0m""",
                     end="",
@@ -106,10 +118,12 @@ def main():
         with open(PROCESSED_FILE, "a+") as ready_file:
             print(file, file=ready_file)
 
-    conversion_pool.close()
-    conversion_pool.join()
     download_pool.terminate()
     download_pool.join()
+
+    ar.close()
+    tar_out_file.close()
+
     print(
         f"""READY.
 

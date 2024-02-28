@@ -1,5 +1,10 @@
 .PHONY: init clean run
 
+all: init clean run
+
+fetch:
+	wget -l1 -r --no-parent https://the-eye.eu/public/AI/cah/laion400m-met-release/laion400m-meta/ -P data --cut-dirs 6
+
 init:
 	mkdir -p images
 
@@ -7,5 +12,5 @@ run:
 	pipenv run ./dl.py
 
 clean:
-	find images -depth 1 -print0 | xargs -0 rm -r --
-
+	rm -rf images
+	mkdir images

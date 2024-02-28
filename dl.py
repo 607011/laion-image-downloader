@@ -72,7 +72,8 @@ def main():
         if file_ext not in ALLOWED_EXTS:
             return
         hash = hashlib.sha256(img_bytes).hexdigest()
-        path = os.path.join("images", *[hash[i : i + 4] for i in range(0, 60, 4)])
+        CHUNK_SIZE = 8
+        path = os.path.join("images", *[hash[i : i + CHUNK_SIZE] for i in range(0, 64 - CHUNK_SIZE, CHUNK_SIZE)])
         os.makedirs(path, exist_ok=True)
         img_filename = os.path.join(path, f"""{hash}{file_ext}""")
         if os.path.exists(img_filename):

@@ -1,7 +1,10 @@
+.vscode
 .DS_Store
 Pipfile.lock
 processed.txt
 images
 images.tar
 images.tar.*
-
+__pycache__
+*.html
+*.parquet

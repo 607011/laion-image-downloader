@@ -81,7 +81,7 @@ def main():
     table = pq.read_table(parquet_file, columns=COLS)
     print(f"""Found {table.num_rows} entries.""")
     index_file = open(args.output, "w+")
-    keywords = table.schema.metadata.get(b"keywords", "").decode()
+    keywords = table.schema.metadata.get(b"keywords", b"").decode()
     print(
         f"""<!DOCTYPE html>
 <html lang="en">
@@ -128,7 +128,17 @@ def main():
 
     print(
         f"""      </div>
-      <div id="stats"><div>selected: <span id="select-count">0</span></div></div>
+      <div id="stats">
+        <div>
+          <div>selected: <span id="select-count">0</span></div>
+          <div style="margin-top: 1ex; display: grid; grid-template-columns: repeat(2, auto); column-gap: 0.7em;">
+            <div class="key-combi">Ctrl+A</div><div>select all</div>
+            <div class="key-combi">Ctrl+D</div><div>deselect all</div>
+            <div class="key-combi">Ctrl+I</div><div>invert selection</div>
+            <div class="key-combi">Ctrl+S</div><div>save selection</div>
+          </div>
+        </div>
+      </div>
     </main>
 
   </body>

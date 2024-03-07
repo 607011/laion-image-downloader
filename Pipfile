@@ -9,6 +9,7 @@ pandas = "*"
 pillow = "*"
 pyyaml = "*"
 tqdm = "*"
+jinja2 = "*"
 
 [dev-packages]
 

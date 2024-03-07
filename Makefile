@@ -9,7 +9,7 @@ init:
 	mkdir -p images
 
 run:
-	pipenv run ./dl.py
+	pipenv run ./dl.py data/the-eye.eu/*.parquet --no-continue --keywords python,forest --output python.parquet
 
 clean:
 	rm -rf images

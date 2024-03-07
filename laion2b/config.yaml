@@ -1,0 +1,5 @@
+field_names:
+  original_height: original_height
+  original_width: original_width
+  keywords: caption
+  url: url

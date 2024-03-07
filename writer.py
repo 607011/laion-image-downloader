@@ -8,17 +8,17 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 
 
-class BufferedParquetWriter:
+class ParquetWriter:
     """Write samples to parquet files incrementally with a buffer"""
 
     def __init__(self, output_file, schema, buffer_size=100):
         self.buffer_size = buffer_size
         self.schema = schema
-        self._initiatlize_buffer()
+        self._initialize_buffer()
         self.output_fd = open(output_file, "wb+")
         self.parquet_writer = pq.ParquetWriter(self.output_fd, schema)
 
-    def _initiatlize_buffer(self):
+    def _initialize_buffer(self):
         self.current_buffer_size = 0
         self.buffer = {k: [] for k in self.schema.names}
 
@@ -28,9 +28,9 @@ class BufferedParquetWriter:
         self.current_buffer_size += 1
 
     def write(self, sample):
-        if self.current_buffer_size >= self.buffer_size:
-            self.flush()
         self._add_sample_to_buffer(sample)
+        if self.current_buffer_size > self.buffer_size:
+            self.flush()
 
     def flush(self):
         """Write the buffer to disk"""
@@ -39,7 +39,7 @@ class BufferedParquetWriter:
 
         df = pa.Table.from_pydict(self.buffer, self.schema)
         self.parquet_writer.write_table(df)
-        self._initiatlize_buffer()
+        self._initialize_buffer()
 
     def close(self):
         self.flush()
@@ -48,16 +48,15 @@ class BufferedParquetWriter:
             self.parquet_writer = None
             self.output_fd.close()
 
+    def __del__(self):
+        self.close()
 
-class ParquetWriter:
-    def __init__(self, output_file, schema):
-        schema.append(pa.field("__key__", pa.string()))
-        self.buffered_parquet_writer = BufferedParquetWriter(output_file, schema, 100)
+    def __enter__(self):
+        return self
 
-    def write(self, key, meta):
-        sample = {"__key__": key}
-        sample.update(meta)
-        self.buffered_parquet_writer.write(sample)
-
-    def close(self):
-        self.buffered_parquet_writer.close()
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            self.close()
+        except AttributeError:
+            if (exc_type, exc_value, traceback) == (None, None, None):
+                raise

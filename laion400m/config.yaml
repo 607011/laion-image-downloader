@@ -1,0 +1,5 @@
+field_names:
+  original_height: HEIGHT
+  original_width: WIDTH
+  keywords: TEXT
+  url: URL

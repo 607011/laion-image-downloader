@@ -8,3 +8,4 @@ images.tar.*
 __pycache__
 *.html
 *.parquet
+*.csv

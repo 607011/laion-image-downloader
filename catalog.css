@@ -1,0 +1,93 @@
+:root {
+    --size: 64px;
+    --outline: calc(var(--size) / 16)
+}
+
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    background-color: #222;
+    color: #eee;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#table {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+#table>a {
+    overflow: hidden;
+    display: inline-block;
+    width: var(--size);
+    height: var(--size);
+    background-size: contain;
+    filter: brightness(90%);
+    transition: all 100ms ease-in-out;
+    outline: none;
+    z-index: 100;
+    position: relative;
+}
+
+#table>a:hover {
+    outline: var(--outline) red solid;
+    z-index: 10002;
+    filter: brightness(100%);
+    transform: scale(1.65);
+}
+
+#table>a.selected {
+    outline: var(--outline) rgb(109, 255, 47) solid;
+    z-index: 10002;
+    filter: brightness(100%);
+}
+
+#table>a:hover.selected {
+    outline: var(--outline) green solid;
+    z-index: 12002;
+    filter: brightness(104%);
+}
+
+#stats {
+    pointer-events: painted;
+    overflow: hidden;
+    position: fixed;
+    right: -92px;
+    top: 8px;
+    width: 300px;
+    min-height: 120px;
+    z-index: 11000;
+}
+
+#stats:hover {
+    pointer-events: auto;
+}
+
+#stats>div {
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: rgba(30, 30, 30, 0.8);
+    border: 1px solid rgba(230, 230, 230, 0.8);
+    min-width: 120px;
+    min-height: 120px;
+    transition-property: transform;
+    transition-duration: 250ms;
+    transition-timing-function: ease;
+    padding: 4px 8px;
+}
+
+#stats:hover>div {
+    transform: translateX(200px);
+}
+
+.key-combi {
+    font-family: 'Courier New', Courier, monospace;
+}

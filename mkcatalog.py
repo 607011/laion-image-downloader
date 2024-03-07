@@ -27,19 +27,39 @@ SOFTWARE.
 
 from argparse import ArgumentParser
 import pyarrow.parquet as pq
+import pyarrow as pa
 from base64 import b64encode
 from urllib.parse import unquote
+from jinja2 import Environment, PackageLoader
+
+
+def links(table: pa.Table, max_images: int):
+    n = 0
+    for batch in table.to_batches():
+        for _idx, row in batch.to_pandas().iterrows():
+            n += 1
+            if n == max_images:
+                return
+            (
+                original_width,
+                original_height,
+                url,
+                text,
+                jpg,
+                hash,
+            ) = row.values
+            yield {
+                "url": unquote(url),
+                "original_width": original_width,
+                "original_height": original_height,
+                "text": text.replace('"', ""),
+                "hash": hash,
+                "jpg": b64encode(jpg).decode(),
+            }
 
 
 def main():
-    COLS = [
-        "original_width",
-        "original_height",
-        "url",
-        "text",
-        "jpg",
-        "hash"
-    ]
+    COLS = ["original_width", "original_height", "url", "text", "jpg", "hash"]
     MAX_IMAGES = 1280
     INDEX_HTML = "index.html"
     DEFAULT_TITLE = "Catalog"
@@ -77,75 +97,28 @@ def main():
 
     args = ap.parse_args()
 
+    jenv = Environment(loader=PackageLoader("catalog"))
+    template = jenv.get_template("index.html")
+
     parquet_file = open(args.parquet, "rb")
     table = pq.read_table(parquet_file, columns=COLS)
     print(f"""Found {table.num_rows} entries.""")
-    index_file = open(args.output, "w+")
+    print(
+        f"""Generating {args.output} with {min(table.num_rows, args.max_images)} images ... """,
+        end="",
+        flush=True,
+    )
     keywords = table.schema.metadata.get(b"keywords", b"").decode()
-    print(
-        f"""<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>{keywords}</title>
-    <meta name="keywords" content="{keywords}">
-    <meta name="generator" content="https://github.com/607011/laion-image-downloader/blob/main/mkcatalog.py">
-    <link rel="stylesheet" href="catalog.css">
-    <script src="catalog.js"></script>
-  </head>
-  <body>
-    <main>
-      <div id="table">""",
-        file=index_file,
-    )
 
-    def write_out():
-        n = 0
-        for batch in table.to_batches():
-            for _idx, row in batch.to_pandas().iterrows():
-                n += 1
-                if n == args.max_images:
-                    return
-                (
-                    original_width,
-                    original_height,
-                    url,
-                    text,
-                    jpg,
-                    hash,
-                ) = row.values
-                print(
-                    f"""        <a href="{unquote(url)}" """
-                    f"""title="{original_width}x{original_height}, """
-                    f"""{text.replace("\"", "")}" """
-                    f"""data-hash="{hash}" """
-                    f"""style="background-image: url('data:image/jpeg;base64,"""
-                    f"""{b64encode(jpg).decode()}')"></a>""",
-                    file=index_file,
-                )
+    with open(args.output, "w+") as index_file:
+        print(
+            template.render(
+                keywords=keywords, title=keywords, links=links(table, args.max_images)
+            ),
+            file=index_file,
+        )
 
-    write_out()
-
-    print(
-        f"""      </div>
-      <div id="stats">
-        <div>
-          <div>selected: <span id="select-count">0</span></div>
-          <div style="margin-top: 1ex; display: grid; grid-template-columns: repeat(2, auto); column-gap: 0.7em;">
-            <div class="key-combi">Ctrl+A</div><div>select all</div>
-            <div class="key-combi">Ctrl+D</div><div>deselect all</div>
-            <div class="key-combi">Ctrl+I</div><div>invert selection</div>
-            <div class="key-combi">Ctrl+S</div><div>save selection</div>
-          </div>
-        </div>
-      </div>
-    </main>
-
-  </body>
-</html>""",
-        file=index_file,
-    )
-
+    print("\nReady.")
 
 if __name__ == "__main__":
     main()

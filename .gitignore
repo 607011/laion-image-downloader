@@ -6,6 +6,7 @@ images
 images.tar
 images.tar.*
 __pycache__
-*.html
 *.parquet
 *.csv
+node_modules
+package-lock.json

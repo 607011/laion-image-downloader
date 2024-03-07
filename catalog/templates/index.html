@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <meta name="keywords" content="{{ keywords }}">
+    <meta name="generator" content="https://github.com/607011/laion-image-downloader/blob/main/mkcatalog.py">
+    <style>
+        :root {
+            --size: 64px;
+            --outline: calc(var(--size) / 16)
+        }
+
+        * {
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            background-color: #222;
+            color: #eee;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        #table {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+        }
+
+        #table>a {
+            overflow: hidden;
+            display: inline-block;
+            width: var(--size);
+            height: var(--size);
+            background-size: contain;
+            filter: brightness(90%);
+            transition: all 100ms ease-in-out;
+            outline: none;
+            z-index: 100;
+            position: relative;
+        }
+
+        #table>a:hover {
+            outline: var(--outline) red solid;
+            z-index: 10002;
+            filter: brightness(100%);
+            transform: scale(1.65);
+        }
+
+        #table>a.selected {
+            outline: var(--outline) rgb(109, 255, 47) solid;
+            z-index: 10002;
+            filter: brightness(100%);
+        }
+
+        #table>a:hover.selected {
+            outline: var(--outline) green solid;
+            z-index: 12002;
+            filter: brightness(104%);
+        }
+
+        #stats {
+            pointer-events: painted;
+            overflow: hidden;
+            position: fixed;
+            right: -92px;
+            top: 8px;
+            width: 300px;
+            min-height: 120px;
+            z-index: 11000;
+        }
+
+        #stats:hover {
+            pointer-events: auto;
+        }
+
+        #stats>div {
+            pointer-events: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: rgba(30, 30, 30, 0.8);
+            border: 1px solid rgba(230, 230, 230, 0.8);
+            min-width: 120px;
+            min-height: 120px;
+            transition-property: transform;
+            transition-duration: 250ms;
+            transition-timing-function: ease;
+            padding: 4px 8px;
+        }
+
+        #stats:hover>div {
+            transform: translateX(200px);
+        }
+
+        .key-combi {
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+    <script>
+        (function (window) {
+            "use strict";
+
+            const el = {};
+
+            function download(filename, data) {
+                const element = document.createElement("a");
+                element.setAttribute("href", `data:text/csv;charset=utf-8,${encodeURIComponent(data)}`);
+                element.setAttribute("download", filename);
+                element.style.display = "none";
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+            }
+
+            function updateSelected() {
+                el.selectCount.innerText = document.querySelectorAll("#table>a.selected").length;
+            }
+
+            function onTileClicked(e) {
+                e.target.classList.toggle("selected");
+                updateSelected();
+                document.querySelector("#table").focus();
+                return e.preventDefault();
+            }
+
+            function onKeyDown(e) {
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                    for (const a of document.querySelectorAll("#table>a")) {
+                        a.classList.add("selected");
+                    }
+                    updateSelected();
+                    return e.preventDefault();
+                }
+                else if ((e.metaKey || e.ctrlKey) && e.key === "i") {
+                    for (const a of document.querySelectorAll("#table>a")) {
+                        a.classList.toggle("selected");
+                    }
+                    updateSelected();
+                    return e.preventDefault();
+                }
+                else if ((e.metaKey || e.ctrlKey) && e.key === "d") {
+                    for (const a of document.querySelectorAll("#table>a")) {
+                        a.classList.remove("selected");
+                    }
+                    updateSelected();
+                    return e.preventDefault();
+                }
+                else if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+                    const selected =
+                        [...document.querySelectorAll("#table>a.selected")]
+                            .map(el => {
+                                const urlMatch = el.style.backgroundImage.match(/url\("(.*)"\)/);
+                                return `${el.getAttribute("data-hash")};${urlMatch[1]};${el.href}`;
+                            });
+                    if (selected.length > 0) {
+                        download("selected-hashes.csv", selected.join("\n"));
+                    }
+                    return e.preventDefault();
+                }
+            }
+
+            function main() {
+                el.selectCount = document.querySelector("#select-count");
+                document.querySelectorAll("#table>a")
+                    .forEach(a => a.addEventListener("click", onTileClicked));
+                document.addEventListener("keydown", onKeyDown);
+                document.querySelector("#table").focus();
+            }
+
+            window.addEventListener("load", main);
+        })(window)
+    </script>
+</head>
+
+<body>
+    <div id="table">
+        {% for a in links %}
+        <a href="{{ a.url }}" title="{{ a.original_width }}x{{ a.original_height }}, {{ a.text }}" data-hash="{{ a.hash }}" style="background-image: url('data:image/jpeg;base64,{{ a.jpg }}')"></a>
+        {% endfor %}
+    </div>
+    <div id="stats">
+        <div>
+            <div>selected: <span id="select-count">0</span></div>
+            <div style="margin-top: 1ex; display: grid; grid-template-columns: repeat(2, auto); column-gap: 0.7em;">
+                <div class="key-combi">Ctrl+A</div>
+                <div>select all</div>
+                <div class="key-combi">Ctrl+D</div>
+                <div>deselect all</div>
+                <div class="key-combi">Ctrl+I</div>
+                <div>invert selection</div>
+                <div class="key-combi">Ctrl+S</div>
+                <div>save selection</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
